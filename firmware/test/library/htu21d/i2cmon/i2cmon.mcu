@@ -1,0 +1,7 @@
+<!DOCTYPE SimulIDE>
+
+<iou name="I2C monitor" core="scripted" script="i2cmon.as" >
+
+    <ioport name="PORTA" pins="sda,scl" />
+
+</iou>

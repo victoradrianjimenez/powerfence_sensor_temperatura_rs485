@@ -1,0 +1,14 @@
+<!DOCTYPE SimulIDE>
+
+<iou name="I2C tester" core="scripted" script="i2ctest.as" >
+
+    <ioport name="PORTA" pins="sda,scl" />
+    <ioport name="PORTB" pins="rxd,txd" />
+
+    <twi name="twi" pins="sda,scl" />
+    <usart name="uart" number="1">
+      <trunit type="tx" pin="txd" />
+      <trunit type="rx" pin="rxd" />
+    </usart>
+
+</iou>

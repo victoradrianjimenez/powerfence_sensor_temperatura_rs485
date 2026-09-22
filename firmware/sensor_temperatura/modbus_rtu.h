@@ -1,14 +1,12 @@
 #pragma once
+#include <stdint.h>
+
+#define MODBUS_LITE_VERSION
 
 #define FIRMWARE_MAYOR_VERSION      1
 #define FIRMWARE_MINOR_VERSION      0
 
 /*****************************************************************************/
-
-#define REG_ADDR_BASE                   0
-
-#define REG_TEMP                        1 //Int16
-#define REG_HUM                         2 //Int16
 
 #define REG_ADDR_FIRMWARE_VERSION       100
 #define REG_ADDR_SLAVE_ADDRESS          101
@@ -23,7 +21,7 @@ enum {
     CONF_POS_PARITY,
     CONF_POS_STOP_BITS,
     CONF_POS_COUNT,
-} conf_variable_position;
+};
 
 /*****************************************************************************/
 
@@ -31,7 +29,7 @@ enum {
     VAR_TEMP=0,
     VAR_HUM,
     VAR_COUNT
-} variable_position;
+};
 
 /*****************************************************************************/
 
@@ -56,21 +54,21 @@ enum {
 /**
  * @brief Inicializar módulo poniendo en cero los registros y cargando configuración.
  */
-void modbus_init();
+void modbus_init(void);
 
 /**
  * @brief Comprobar si tengo solicituders y procesarlas en caso de tenerlas.
  */
-void modbus_check_requests();
+void modbus_check_requests(void);
 
 /**
  * @brief Establecer el valor de un registro.
  * @param pos Posición dentro del array de variables (no es la dirección modbus).
  * @param value Nuevo valor para el registro.
  */
-void modbus_set_register(uint8_t pos, float *value);
+void modbus_set_register(uint8_t pos, uint16_t *value);
 
 /**
- * @brief Funcion de prueba con valores fijos para los registros.
+ * @brief Funcion de prueba.
  */
-void test_modbus_rtu();
+void test_modbus_rtu(void);

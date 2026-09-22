@@ -1,0 +1,45 @@
+<circuit version="1.1.0-SR1" rev="2005" stepSize="1000000" stepsPS="1000000" NLsteps="100000" reaStep="1000000" animate="0" >
+
+<item itemtype="Subcircuit" CircId="Nano-1" mainComp="false" Show_id="true" Show_Val="false" Pos="-88,-116" rotation="0" hflip="1" vflip="1" label="Nano-1" idLabPos="0,-20" labelrot="0" valLabPos="-16,20" valLabRot="0">
+<mainCompProps MainCompId="m328 TQFP-269" Frequency="16 MHz" Program="../../../../../../../../../../tmp/arduino_build_871495/arduino_nano_htu21d.ino.hex" Auto_Load="true" saveEepr="true" MainMcu="false" SerialMon="1" />
+</item>
+
+<item itemtype="Potentiometer" CircId="Potentiometer-4" mainComp="false" ShowProp="Resistance" Show_id="false" Show_Val="true" Pos="-268,12" rotation="-90" hflip="1" vflip="1" label="Potentiometer-4" idLabPos="-16,-40" labelrot="0" valLabPos="15,-15.1092" valLabRot="0" Resistance="1 kΩ" Value_Ohm="532 Ω" Slider="false" Scale="1" />
+
+<item itemtype="Rail" CircId="Rail-5" mainComp="false" ShowProp="Voltage" Show_id="false" Show_Val="true" Pos="-192,16" rotation="90" hflip="1" vflip="1" label="Rail-5" idLabPos="-5,-10" labelrot="-90" valLabPos="-15.9127,5.02183" valLabRot="-90" Voltage="-1 V" />
+
+<item itemtype="Rail" CircId="Rail-6" mainComp="false" ShowProp="Voltage" Show_id="false" Show_Val="true" Pos="-132,-52" rotation="90" hflip="1" vflip="1" label="Rail-6" idLabPos="-5,-10" labelrot="-90" valLabPos="-12,6" valLabRot="-90" Voltage="3.3 V" />
+
+<item itemtype="MCU" CircId="htu21d-7" mainComp="false" Show_id="true" Show_Val="true" Pos="-184,-36" rotation="0" hflip="1" vflip="1" label="htu21d-7" idLabPos="0,-20" labelrot="0" valLabPos="-16,20" valLabRot="0" MainMcu="true" />
+
+<item itemtype="Rail" CircId="Rail-8" mainComp="false" ShowProp="Voltage" Show_id="false" Show_Val="true" Pos="-228,-68" rotation="90" hflip="1" vflip="1" label="Rail-8" idLabPos="-5,-10" labelrot="-90" valLabPos="-12,6" valLabRot="-90" Voltage="2 V" />
+
+<item itemtype="Potentiometer" CircId="Potentiometer-9" mainComp="false" ShowProp="Resistance" Show_id="false" Show_Val="true" Pos="-228,-20" rotation="-90" hflip="1" vflip="1" label="Potentiometer-9" idLabPos="-16,-40" labelrot="0" valLabPos="4.24014,5.43239" valLabRot="0" Resistance="1 kΩ" Value_Ohm="439 Ω" Slider="false" Scale="1" />
+
+<item itemtype="Node" CircId="Node-3" mainComp="false" Pos="-228,36" />
+
+<item itemtype="Node" CircId="Node-10" mainComp="false" Pos="-228,-44" />
+
+<item itemtype="Connector" uid="Connector-1" startpinid="htu21d-7-PORTBvhumid" endpinid="Potentiometer-4-PinM" pointList="-192,-12,-216,-12,-216,12,-252,12" />
+
+<item itemtype="Connector" uid="Connector-2" startpinid="Rail-5-outnod" endpinid="Node-3-0" pointList="-192,32,-192,36,-228,36" />
+
+<item itemtype="Connector" uid="Connector-3" startpinid="Potentiometer-4-PinA" endpinid="Node-3-1" pointList="-268,28,-268,36,-228,36" />
+
+<item itemtype="Connector" uid="Connector-4" startpinid="Potentiometer-4-PinB" endpinid="Node-10-1" pointList="-268,-4,-268,-44,-228,-44" />
+
+<item itemtype="Connector" uid="Connector-6" startpinid="Rail-8-outnod" endpinid="Node-10-0" pointList="-228,-52,-228,-44" />
+
+<item itemtype="Connector" uid="Connector-7" startpinid="Node-10-2" endpinid="Potentiometer-9-PinB" pointList="-228,-44,-228,-36" />
+
+<item itemtype="Connector" uid="Connector-8" startpinid="htu21d-7-PORTBvdd" endpinid="Rail-6-outnod" pointList="-144,-28,-132,-28,-132,-36" />
+
+<item itemtype="Connector" uid="Connector-9" startpinid="Node-3-2" endpinid="Potentiometer-9-PinA" pointList="-228,36,-228,-4" />
+
+<item itemtype="Connector" uid="Connector-10" startpinid="Potentiometer-9-PinM" endpinid="htu21d-7-PORTBvtemp" pointList="-212,-20,-192,-20" />
+
+<item itemtype="Connector" uid="Connector-12" startpinid="htu21d-7-PORTAsda" endpinid="Nano-1-A4" pointList="-144,-20,-104,-20,-104,40,-12,40,-12,-44,-32,-44" />
+
+<item itemtype="Connector" uid="Connector-13" startpinid="htu21d-7-PORTAscl" endpinid="Nano-1-A5" pointList="-144,-12,-112,-12,-112,48,-4,48,-4,-52,-32,-52" />
+
+</circuit>

@@ -1,0 +1,8 @@
+<!DOCTYPE SimulIDE>
+
+<iou name="HTU21D" core="scripted" script="htu21d.as" >
+
+    <ioport name="PORTA" pins="sda,scl" />
+    <ioport name="PORTB" pins="vdd,vtemp,vhumid" />
+
+</iou>

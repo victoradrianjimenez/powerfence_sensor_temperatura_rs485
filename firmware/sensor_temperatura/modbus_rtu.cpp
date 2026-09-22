@@ -1,19 +1,21 @@
 // docs: https://www.beijerelectronics.com/docs/DIO/GL-997X/en/modbus-interface.html
 
+#ifndef MODBUS_LITE_VERSION
 #include <avr/eeprom.h>
+#endif
 #include <util/delay.h>
 #include "soft_uart.h"
 #include "modbus_rtu.h"
 
-typedef union {
-    float f;
-    uint16_t u16[2];
-    uint32_t u32;
-} my_data;
-
 // Tamaño del buffer local
 #define BUFFER_SIZE (8) // suficiente para almacenar el mensaje modbus más largo
 
+typedef union {
+    uint16_t u16;
+    uint8_t u8[2];
+} my_uint16;
+
+#ifndef MODBUS_LITE_VERSION
 static const uint8_t config_register_map[CONF_POS_COUNT] = {
     REG_ADDR_FIRMWARE_VERSION,
     REG_ADDR_SLAVE_ADDRESS,
@@ -21,58 +23,41 @@ static const uint8_t config_register_map[CONF_POS_COUNT] = {
     REG_ADDR_PARITY,
     REG_ADDR_STOP_BITS
 };
-
-static const uint8_t var_register_map[VAR_COUNT] = {
-    REG_TEMP, 
-    REG_HUM
-};
-
-typedef union {
-    uint16_t u16;
-    uint8_t u8[2];
-} my_uint16;
-
-typedef union {
-    uint32_t u32;
-    uint8_t u8[4];
-} my_uint32;
+static uint16_t config_registers[CONF_POS_COUNT] EEMEM;   // en memoria no volatil
+#endif
 
 static uint8_t request_pos = 0;
 static uint8_t request_buf[BUFFER_SIZE];
 static uint16_t holding_registers[VAR_COUNT];
-static uint16_t config_registers[CONF_POS_COUNT] EEMEM;   // en memoria no volatil
-static my_uint16 crc;
-static uint8_t slave_address;
 
-static const uint16_t crc16_nibble_table[16] = {
-    0x0000, 0xCC01, 0xD801, 0x1400,
-    0xF001, 0x3C00, 0x2800, 0xE401,
-    0xA001, 0x6C00, 0x7800, 0xB401,
-    0x5000, 0x9C01, 0x8801, 0x4400
-};
+static my_uint16 crc;
+static uint8_t slave_address = MODBUS_DEFAULT_SLAVE_ADDRESS;
 
 #define crc16_init(crc) ((crc)->u16 = 0xFFFF)
 
+// CRC-16 Modbus (poly 0xA001, reflejado) bit a bit
 static void crc16_step(my_uint16* crc, uint8_t* d, uint8_t n) {
-    for (uint8_t i=0; i<n; i++){
+    for (uint8_t i = 0; i < n; i++) {
         crc->u16 ^= d[i];
-        crc->u16 = (crc->u16 >> 4) ^ crc16_nibble_table[crc->u8[0] & 0x0F]; // nibble bajo
-        crc->u16 = (crc->u16 >> 4) ^ crc16_nibble_table[crc->u8[0] & 0x0F]; // nibble alto
+        for (uint8_t b = 0; b < 8; b++) {
+            crc->u16 = (crc->u16 & 1) ? (crc->u16 >> 1) ^ 0xA001 : crc->u16 >> 1;
+        }
     }
 }
 
-void modbus_init(){
+void modbus_init(void){
     // pongo datos en cero
     for (uint8_t i = 0; i < VAR_COUNT; i++){
         holding_registers[i] = 0;
     }
+#ifndef MODBUS_LITE_VERSION
     // Si EEPROM nunca fue inicializada, poner valor por defecto
     slave_address = eeprom_read_word(&config_registers[CONF_POS_SLAVE_ADDRESS]);
     if (slave_address > 247 || slave_address == 0x00) {
         slave_address = MODBUS_DEFAULT_SLAVE_ADDRESS; // valor por defecto
         eeprom_update_word(&config_registers[CONF_POS_SLAVE_ADDRESS], MODBUS_DEFAULT_SLAVE_ADDRESS);
     }
-    uint16_t baudrate = eeprom_read_word(&config_registers[CONF_POS_BAUD_RATE]);
+    baud_rate_t baudrate = (baud_rate_t)eeprom_read_word(&config_registers[CONF_POS_BAUD_RATE]);
     if (soft_uart_check_baud_rate(baudrate)){
         soft_uart_set_baud_rate(baudrate);
     } else {
@@ -87,12 +72,13 @@ void modbus_init(){
     if (eeprom_read_word(&config_registers[CONF_POS_STOP_BITS]) != MODBUS_DEFAULT_STOP_BITS){
         eeprom_update_word(&config_registers[CONF_POS_STOP_BITS], MODBUS_DEFAULT_STOP_BITS);
     }
+#endif
 }
 
 static void modbus_send_exception(uint8_t exc_code) {
     uint8_t out[5] = {
         slave_address,
-        request_buf[1] | 0x80,
+        (uint8_t)(request_buf[1] | 0x80),
         exc_code,
     };
     crc16_init(&crc);
@@ -104,12 +90,13 @@ static void modbus_send_exception(uint8_t exc_code) {
     soft_uart_re();
 }
 
-static inline void modbus_send_echo(){
+static inline void modbus_send_echo(void){
     soft_uart_de();
     soft_uart_send(request_buf, sizeof(request_buf));
     soft_uart_re();
 }
 
+#ifndef MODBUS_LITE_VERSION
 static inline uint8_t modbus_read_config_registers(uint16_t addr, uint8_t nregs){
     // preparo respuesta con registros
     uint8_t j;
@@ -125,7 +112,7 @@ static inline uint8_t modbus_read_config_registers(uint16_t addr, uint8_t nregs)
     uint8_t out[3] = {
         slave_address, // slave address
         MODBUS_FUNCTION_READ_HOLDING_REGISTERS, // command
-        nregs << 1     // number of bytes
+        (uint8_t)(nregs << 1)     // number of bytes
     };
     crc16_step(&crc, out, 3);
     soft_uart_de();
@@ -145,19 +132,21 @@ static inline uint8_t modbus_read_config_registers(uint16_t addr, uint8_t nregs)
     soft_uart_re();
     return 1;
 }
+#endif
 
-static inline void modbus_read_holding_registers(){
+static inline void modbus_read_holding_registers(void){
     my_uint16 addr = {.u8 = {request_buf[3], request_buf[2]}};
     uint8_t nregs = request_buf[5]; // uint16_t nregs = (request_buf[4] << 8) | request_buf[5];
-    if (request_buf[4] != 0) {
+    if (request_buf[4] != 0 || nregs == 0 || nregs > 125) {
         modbus_send_exception(MDOBUS_EXC_CODE_ILEGAL_DATA); //ilegal address
         return; // hasta 256 elementos
     }
     // verificar direccion
-    if (!(addr.u16 >= REG_ADDR_BASE && addr.u16 + nregs <= REG_ADDR_BASE + VAR_COUNT)){
-        if (!modbus_read_config_registers(addr.u16, nregs)){
+    if (!(addr.u16 >= 0 && addr.u16 + nregs <= VAR_COUNT)){
+#ifndef MODBUS_LITE_VERSION
+        if (!modbus_read_config_registers(addr.u16, nregs))
+#endif
             modbus_send_exception(MDOBUS_EXC_CODE_ILEGAL_ADDRESS); //ilegal address
-        }
         return;
     }
     // preparo respuesta con registros
@@ -165,14 +154,14 @@ static inline void modbus_read_holding_registers(){
     my_uint16 val;
     uint8_t out[3] = {
         slave_address, // slave address
-        MODBUS_FUNCTION_READ_HOLDING_REGISTERS, // command
-        nregs << 1,    // number of bytes
+        request_buf[1], // command
+        (uint8_t)(nregs << 1),    // number of bytes
     };
     crc16_step(&crc, out, 3);
     soft_uart_de();
     soft_uart_send(out, 3);
     while(nregs-- > 0){
-        val.u16 = holding_registers[addr.u16++ - REG_ADDR_BASE];
+        val.u16 = holding_registers[addr.u16++];
         out[0] = val.u8[1];
         out[1] = val.u8[0];
         soft_uart_send(out, 2);
@@ -182,7 +171,8 @@ static inline void modbus_read_holding_registers(){
     soft_uart_re();
 }
 
-static inline void modbus_write_holding_register(){
+#ifndef MODBUS_LITE_VERSION
+static inline void modbus_write_holding_register(void){
     uint8_t j;
     my_uint16 addr = {.u8 = {request_buf[3], request_buf[2]}};
     // buscar posicion del registro en base a su address
@@ -203,7 +193,7 @@ static inline void modbus_write_holding_register(){
         break;
     case CONF_POS_BAUD_RATE:
         // check value
-        if (!soft_uart_check_baud_rate(value.u16)){
+        if (!soft_uart_check_baud_rate((baud_rate_t)value.u16)){
             modbus_send_exception(MDOBUS_EXC_CODE_ILEGAL_DATA); // illegal data
             return;
         }
@@ -235,21 +225,25 @@ static inline void modbus_write_holding_register(){
         eeprom_update_word(&config_registers[j], value.u16);
     }
 }
+#endif
 
-static inline void modbus_process() {
+static inline void modbus_process(void) {
     switch (request_buf[1]){
     case MODBUS_FUNCTION_READ_HOLDING_REGISTERS:
+    case MODBUS_FUNCTION_READ_INPUT_REGISTERS:
         modbus_read_holding_registers();
         break;
+#ifndef MODBUS_LITE_VERSION
     case MODBUS_FUNCTION_WRITE_SINGLE_REGISTER:
         modbus_write_holding_register();
         break;
+#endif
     default:
         modbus_send_exception(MDOBUS_EXC_CODE_ILEGAL_FUNCTION); // illegal function
     }
 }
 
-void modbus_check_requests() {
+void modbus_check_requests(void) {
     // comprobar si tengo datos entrantes
     while (soft_uart_available()){
         // guardar byte en buffer local
@@ -261,6 +255,7 @@ void modbus_check_requests() {
             // procesar segun la funcion
             switch (request_buf[1]){
             case MODBUS_FUNCTION_READ_HOLDING_REGISTERS:
+            case MODBUS_FUNCTION_READ_INPUT_REGISTERS:
             case MODBUS_FUNCTION_WRITE_SINGLE_REGISTER:
                 // ambas funciones soportadas usan trama de tamaño fijo (8 bytes)
                 if (request_pos < 8) continue; // faltan bytes
@@ -275,9 +270,6 @@ void modbus_check_requests() {
                     // residual que conservar, alcanza con reiniciar la posición
                     request_pos = 0;
                     return;
-                }else{
-                    soft_uart_send((uint8_t*)&crc, 2);
-                    soft_uart_send(request_buf+6, 2);
                 }
                 // CRC inválido: se trata como trama corrupta, cae al
                 // descarte de 1 byte de más abajo para resincronizar
@@ -296,14 +288,11 @@ void modbus_check_requests() {
     }
 }
 
-void modbus_set_register(uint8_t pos, float *value){
-    my_data var = {.f = *value};
-    uint8_t reg = var_register_map[pos];
-    holding_registers[reg] = var.u16[0];
-    holding_registers[reg + 1] = var.u16[1];
+void modbus_set_register(uint8_t pos, uint16_t *value){
+    holding_registers[pos] = (uint16_t)*value;
 }
 
-void test_modbus_rtu(){
+void test_modbus_rtu(void){
     // modbus: enviar mensajes por USI UART
     uart_init(BAUD_RATE_9600);
     modbus_init();

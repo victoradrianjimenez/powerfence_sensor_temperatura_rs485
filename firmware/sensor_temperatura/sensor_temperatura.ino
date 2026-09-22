@@ -39,14 +39,12 @@ enum {
  * @brief Main function 
  */
 int main() {
-    //test_timer(PB3); //PA1
-    //test_uart0();
-    //test_uart1();
-    //test_pzem();
+    //test_timer(PB1);
+    //test_uart();
     //test_modbus_rtu();
-    //test_lcd();
-    
-    float temp, hum;
+    //htu21d_test();
+
+    int16_t temp, hum;
     uint8_t repetition = 0, sensor_position = 0, state = STATE_IDLE;
     uint16_t current_ts = 0, request_ts = 0, uart_busy_ts = 0;
     uint16_t last_measurement_ts = -MEASURING_PERIOD_MS; // forzar lectura de sensores
@@ -59,17 +57,16 @@ int main() {
     ADMUX = 0;
     ACSR |= (1 << ACD); // Disable Analog Comparator 
     PRR |= (1 << PRADC); // apaga ADC 
-
-    // inicializar uarts y timer
+    // inicializar timer
+    timer_init();
+    // inicializar uart
     uart_init(BAUD_RATE_9600);
     // modbus: enviar mensajes por USI UART
     modbus_init();
     // sensor de temperatura y humedad
     htu21d_init();
-
     //set_sleep_mode(SLEEP_MODE_IDLE);
     //sleep_enable();
-
     // loop principal
     wdt_enable(WDTO_4S); // habilitar recién al final, justo antes del while(1)
     while (1) {
@@ -107,9 +104,15 @@ int main() {
                 repetition++;
                 // enviar solicitud
                 if (sensor_position == 0){
-                    htu21d_request_temperature();
+                    if (!htu21d_request_temperature()){
+                        state = STATE_FAIL;
+                        break;
+                    }
                 } else {
-                    htu21d_request_humidity();
+                    if (!htu21d_request_humidity()){
+                        state = STATE_FAIL;
+                        break;
+                    }
                 }
                 // entrar en estado de espera de respuesta
                 request_ts = current_ts;
@@ -155,6 +158,7 @@ int main() {
             break;
 
         case STATE_FAIL: // uno de los sensores falla despues de N intentos
+            htu21d_reset();
             state = STATE_IDLE;
             break;
 

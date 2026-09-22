@@ -1,11 +1,13 @@
 #pragma once
 
+#define UART_LITE_VERSION
+
 #define UART_RX    PB3
 #define UART_TX    PB4
 #define UART_DE    PB1
 
 // Tamaño del buffer de recepción - POTENCIA DE 2 !!
-#define UART_RX_BUFFER_SIZE (4) // minimo 2
+#define UART_RX_BUFFER_SIZE (8) // minimo 2
 
 typedef enum {
     BAUD_RATE_2400=0,

@@ -6,23 +6,19 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include "htu21d.h"
+#include <stdlib.h> // para dtostrf
 
 #define I2C_DELAY() _delay_us(5)
 
-// Tabla de nibbles para CRC-8 del HTU21D (poly 0x31, MSB-first, sin reflexión).
-static const uint8_t crc8_nibble_table[16] = {
-    0x00, 0x31, 0x62, 0x53, 0xC4, 0xF5, 0xA6, 0x97,
-    0xB9, 0x88, 0xDB, 0xEA, 0x7D, 0x4C, 0x1F, 0x2E
-};
- 
-// Calcula el CRC-8 del HTU21D sobre los 2 bytes de dato (MSB, LSB), procesando un nibble (4 bits) a la vez en vez de bit a bit.
 static uint8_t htu21d_crc8(uint8_t msb, uint8_t lsb) {
-    uint8_t crc = msb;
-    crc = (uint8_t)((crc << 4) ^ crc8_nibble_table[(crc >> 4) & 0x0F]); // nibble alto
-    crc = (uint8_t)((crc << 4) ^ crc8_nibble_table[(crc >> 4) & 0x0F]); // nibble bajo
-    crc ^= lsb;
-    crc = (uint8_t)((crc << 4) ^ crc8_nibble_table[(crc >> 4) & 0x0F]); // nibble alto
-    crc = (uint8_t)((crc << 4) ^ crc8_nibble_table[(crc >> 4) & 0x0F]); // nibble bajo
+    uint8_t crc = 0;
+    uint8_t data[2] = { msb, lsb };
+    for (uint8_t i = 0; i < 2; i++) {
+        crc ^= data[i];
+        for (uint8_t b = 0; b < 8; b++) {
+            crc = (crc & 0x80) ? (uint8_t)((crc << 1) ^ 0x31) : (uint8_t)(crc << 1);
+        }
+    }
     return crc;
 }
 
@@ -115,6 +111,7 @@ static uint8_t htu21d_read(uint16_t *raw_out){
     uint8_t msb = i2c_read_byte(1); // ACK para pedir el siguiente byte
     uint8_t lsb = i2c_read_byte(1); // ACK para pedir el CRC
     uint8_t crc = i2c_read_byte(0);               // leer CRC y responder NACK (fin de lectura)
+
     i2c_stop();
     if (htu21d_crc8(msb, lsb) != crc) return 0; // dato corrupto: descartar esta lectura
     uint16_t raw = ((uint16_t)msb << 8) | lsb;
@@ -138,12 +135,13 @@ uint8_t htu21d_request_temperature(){
     return htu21d_request(HTU21D_CMD_TEMP_NOHOLD);
 }
  
-// Temperatura en °C. Devuelve 1 si la lectura fue exitosa.
-uint8_t htu21d_read_temperature(float *temp_c){
+// Temperatura en °C. Devuelve 1 si la lectura fue exitosa. 
+uint8_t htu21d_read_temperature(int16_t *temp_c100){
+    // T = -46.85 + 175.72 * (raw / 65536), en centesimas de grado C
     uint16_t raw;
     if (!htu21d_read(&raw)) return 0;
-    // Fórmula del datasheet: T = -46.85 + 175.72 * (ST / 2^16)
-    *temp_c = -46.85f + 175.72f * ((float)raw / 65536.0f);
+    int32_t t = ((int32_t)raw * 17572L) >> 16;  // 175.72 * 100 / 65536
+    *temp_c100 = (int16_t)(t - 4685);           // -46.85 * 100
     return 1;
 }
 
@@ -152,11 +150,12 @@ uint8_t htu21d_request_humidity(){
 }
 
 // Humedad relativa en %. Devuelve 1 si la lectura fue exitosa.
-uint8_t htu21d_read_humidity(float *humidity_rh){
+uint8_t htu21d_read_humidity(int16_t *humidity_rh100){
+    // RH = -6 + 125 * (raw / 65536), devuelto como centesimas de %HR (int16, valor x100)
     uint16_t raw;
     if (!htu21d_read(&raw)) return 0;
-    // Fórmula del datasheet: RH = -6 + 125 * (SRH / 2^16)
-    *humidity_rh = -6.0f + 125.0f * ((float)raw / 65536.0f);
+    int32_t h = ((int32_t)raw * 12500L) >> 16;   // 125 * 100 / 65536
+    *humidity_rh100 = (int16_t)(h - 600);             // -6 * 100 = -600
     return 1;
 }
 
@@ -167,18 +166,41 @@ uint8_t htu21d_reset(void){
     return ok;
 }
 
+
+    #include <stdlib.h> // para dtostrf
+    #include <string.h>
+    #include "soft_uart.h"
+
 void htu21d_test(){
-    float temp, hum;
+    char data[10];
+    uint8_t res;
+    uint16_t temp, hum;
+    uart_init(BAUD_RATE_9600);
     htu21d_init();
-
-    htu21d_reset();
-
-    htu21d_request_temperature();
-    _delay_ms(50);
-    htu21d_read_temperature(&temp);
-
-    htu21d_request_humidity();
-    _delay_ms(50);
-    htu21d_read_humidity(&temp);
-
+    res = htu21d_request_temperature();
+    if (res){ 
+        _delay_ms(50);
+        res = htu21d_read_temperature(&temp);
+        if (res){
+            data[0] = 'T';
+            dtostrf(temp, 1, 2, &data[1]); // ancho mínimo 1, 2 decimales
+            soft_uart_send(data, strlen(data));
+        }
+    }
+    res = htu21d_request_humidity();
+    if (res){
+        _delay_ms(50);
+        res = htu21d_read_humidity(&hum);
+        if (res){
+            data[0] = 'H';
+            dtostrf(hum, 1, 2, &data[1]);            // ancho mínimo 1, 2 decimales
+            soft_uart_send(data, strlen(data));        
+        }
+    }
+    res = htu21d_reset();
+    if (res){
+        data[0] = 'R';
+        data[1] = '\0';
+        soft_uart_send(data, strlen(data));
+    }
 }

@@ -44,7 +44,7 @@ void uart_init(baud_rate_t b) {
 
     // interrupciones de pines de entrada
     GIFR = (1 << PCIF); // clear pin change interrupt flag.
-    GIMSK |= (1 << PCIE) | (1 << PCIE); // enable external interrupts
+    GIMSK |= (1 << PCIE); // enable external interrupts
     PCMSK |= UART_RX_MASK; // enable pin change on pin RX
     sei();
 }
@@ -104,20 +104,20 @@ ISR(PCINT0_vect) {
     OCR0B = (tcnt > half) ? tcnt - half - 1 : tcnt + half;
     
     // Enable RX sampling interrupt
-    TIFR |= (1 << OCF0B);
+    TIFR = (1 << OCF0B);
     TIMSK |= (1 << OCIE0B);
     // Prepare for next frame
     uart_rx_bit_count = 9;
     // Disable pin change interrupt during reception
-    GIMSK &= ~(1 << INT0);
+    GIMSK &= ~(1 << PCIE);
 }
 
 // Interrupción TIMER0 COMPB para RX de UART0 (activa solo durante la recepción)
 ISR(TIMER0_COMPB_vect) {
-    #define uart0_rx_byte GPIOR0 //static uint8_t uart0_rx_byte = 0; // RX state machine variable
+    #define uart_rx_byte GPIOR0 //static uint8_t uart0_rx_byte = 0; // RX state machine variable
     // Reading start bit + 8 data bits
     if (uart_rx_bit_count--){
-        uart0_rx_byte = (PINB & UART_RX_MASK) ? (uart0_rx_byte >> 1) | 0x80 : (uart0_rx_byte >> 1);
+        uart_rx_byte = (PINB & UART_RX_MASK) ? (uart_rx_byte >> 1) | 0x80 : (uart_rx_byte >> 1);
         return;
     }
     // Stop bit validation
@@ -126,13 +126,13 @@ ISR(TIMER0_COMPB_vect) {
         uint8_t pos = uart_rx_head;
         uint8_t next = (pos + 1) & (UART_RX_BUFFER_SIZE - 1);
         if (next != uart_rx_tail){
-            uart_rx_buffer[pos] = uart0_rx_byte;
+            uart_rx_buffer[pos] = uart_rx_byte;
             uart_rx_head = next;
         }
     }
     // Re-enable start detection
-    GIFR |= (1 << INTF0);
-    GIMSK |= (1 << INT0);
+    GIFR = (1 << PCIF);
+    GIMSK |= (1 << PCIE);
     // Disable sampling interrupt
     TIMSK &= ~(1 << OCIE0B);
 }
@@ -159,13 +159,14 @@ void soft_uart_send(uint8_t* buf, uint8_t sz){
         // Wait while UART is transmitting
         while(TIMSK & ((1 << OCIE0A)));
         // Prepare frame: start + data + stop
-        uart_tx_data = ((uint16_t)buf[i] | 0xFF00) << 1;
-        uart_tx_bit_count = 9;
+        uart_tx_data = ((uint16_t)buf[i] | 0xFF00) << 1; // el shift es para el start bit
+        uart_tx_bit_count = (i == sz - 1) ? 10 : 9; // 9: la ISR apaga el timer al iniciar el stop bit, 10: la ISR apaga el timer al TERMINAR el stop bit.
         // Start transmission (enable timer interruptions)
-        TIFR |= (1 << OCF0A);
+        TIFR = (1 << OCF0A);
+        uint8_t sreg = SREG;
         cli();
         TIMSK |= (1 << OCIE0A);
-        sei();
+        SREG = sreg;  // restaurar (no fuerza sei)
     }
 }
 
@@ -178,7 +179,7 @@ void soft_uart_de(){
 
 void soft_uart_re(){
 #ifdef UART_DE 
-    // habilitar DE: RS-485 → TX
+    // deshabilitar DE: RS-485 → RX
     while(TIMSK & ((1 << OCIE0A))); // wait for the stop bit
     PORTB &= ~(1 << UART_DE);
 #endif

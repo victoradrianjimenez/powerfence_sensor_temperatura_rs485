@@ -1,0 +1,13 @@
+<!DOCTYPE SimulIDE>
+
+<itemlib>
+    
+  <itemset category="Scripted" type="MCU" folder="scripted/htu21d" icon="" >
+    <item name="htu21d" package="scripted/htu21d/htu21d" data="scripted/htu21d/htu21d"></item>
+    <item name="i2cmon" package="scripted/htu21d/i2cmon" data="scripted/htu21d/i2cmon"></item>
+    <item name="i2ctest" package="scripted/htu21d/i2ctest" data="scripted/htu21d/i2ctest"></item>
+
+  </itemset>
+  
+</itemlib>
+

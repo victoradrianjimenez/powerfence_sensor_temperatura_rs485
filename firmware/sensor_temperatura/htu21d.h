@@ -14,21 +14,16 @@
 void htu21d_init(void);
 
 /**
- * @brief Intentar lectura (mientras mide, el HTU21D responde NACK a su dirección)
- */
-uint8_t htu21d_read(uint16_t *raw_out);
- 
-/**
  * @brief Temperatura en °C. Devuelve 1 si la lectura fue exitosa.
  */
 uint8_t htu21d_request_temperature();
-uint8_t htu21d_read_temperature(float *temp_c);
+uint8_t htu21d_read_temperature(int16_t *temp_c100);
  
 /**
  * @brief Humedad relativa en %. Devuelve 1 si la lectura fue exitosa.
  */
 uint8_t htu21d_request_humidity();
-uint8_t htu21d_read_humidity(float *humidity_rh);
+uint8_t htu21d_read_humidity(int16_t *humidity_rh100);
 
 /**
  * @brief Reinicia el sensor (recomendado al inicio, tarda ~15ms en estar listo)

@@ -2002,8 +2002,8 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x04_Pin"
-			(at 150.114 63.246 0)
+		(property "Value" "HTU21X"
+			(at 145.288 64.262 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2076,8 +2076,8 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x05_Pin"
-			(at 150.114 78.232 0)
+		(property "Value" "TTL to RS485"
+			(at 148.336 79.756 0)
 			(effects
 				(font
 					(size 1.27 1.27)
