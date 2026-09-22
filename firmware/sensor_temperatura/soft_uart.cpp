@@ -50,17 +50,7 @@ void uart_init(baud_rate_t b) {
 }
 
 uint8_t soft_uart_check_baud_rate(baud_rate_t b){
-    switch (b){
-    case BAUD_RATE_2400:
-    case BAUD_RATE_4800:
-    case BAUD_RATE_9600:
-    case BAUD_RATE_14400:
-    case BAUD_RATE_19200:
-        return 1;
-        break;
-    default:
-        return 0;
-    }
+    return b < BAUD_RATE_COUNT;
 }
 
 void soft_uart_set_baud_rate(baud_rate_t b){
@@ -163,10 +153,9 @@ void soft_uart_send(uint8_t* buf, uint8_t sz){
         uart_tx_bit_count = (i == sz - 1) ? 10 : 9; // 9: la ISR apaga el timer al iniciar el stop bit, 10: la ISR apaga el timer al TERMINAR el stop bit.
         // Start transmission (enable timer interruptions)
         TIFR = (1 << OCF0A);
-        uint8_t sreg = SREG;
         cli();
         TIMSK |= (1 << OCIE0A);
-        SREG = sreg;  // restaurar (no fuerza sei)
+        sei();
     }
 }
 
@@ -180,7 +169,7 @@ void soft_uart_de(){
 void soft_uart_re(){
 #ifdef UART_DE 
     // deshabilitar DE: RS-485 → RX
-    while(TIMSK & ((1 << OCIE0A))); // wait for the stop bit
+    while(TIMSK & ((1 << OCIE0A))); // wait for the stop bit finish
     PORTB &= ~(1 << UART_DE);
 #endif
 }

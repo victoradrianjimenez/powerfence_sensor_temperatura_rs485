@@ -1,7 +1,5 @@
 #pragma once
 
-#define UART_LITE_VERSION
-
 #define UART_RX    PB3
 #define UART_TX    PB4
 #define UART_DE    PB1
@@ -14,7 +12,8 @@ typedef enum {
     BAUD_RATE_4800,
     BAUD_RATE_9600,
     BAUD_RATE_14400,
-    BAUD_RATE_19200
+    BAUD_RATE_19200,
+    BAUD_RATE_COUNT
 } baud_rate_t;
 
 /**

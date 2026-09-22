@@ -104,12 +104,12 @@ int main() {
                 repetition++;
                 // enviar solicitud
                 if (sensor_position == 0){
-                    if (!htu21d_request_temperature()){
+                    if (!htu21d_request(HTU21D_CMD_TEMP_NOHOLD)){
                         state = STATE_FAIL;
                         break;
                     }
                 } else {
-                    if (!htu21d_request_humidity()){
+                    if (!htu21d_request(HTU21D_CMD_HUM_NOHOLD)){
                         state = STATE_FAIL;
                         break;
                     }
@@ -158,7 +158,7 @@ int main() {
             break;
 
         case STATE_FAIL: // uno de los sensores falla despues de N intentos
-            htu21d_reset();
+            htu21d_request(HTU21D_CMD_SOFT_RESET);
             state = STATE_IDLE;
             break;
 

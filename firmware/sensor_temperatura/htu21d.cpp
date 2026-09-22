@@ -6,7 +6,9 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include "htu21d.h"
+#include "soft_uart.h"
 #include <stdlib.h> // para dtostrf
+#include <string.h> // para strlen
 
 #define I2C_DELAY() _delay_us(5)
 
@@ -88,7 +90,7 @@ static uint8_t i2c_read_byte(uint8_t send_ack){
 }
 
 // Envía el comando de medición
-static uint8_t htu21d_request(uint8_t cmd){
+uint8_t htu21d_request(uint8_t cmd){
     uint8_t ok = 0;
     i2c_start();
     ok = i2c_write((HTU21D_ADDR << 1) | 0);
@@ -110,13 +112,12 @@ static uint8_t htu21d_read(uint16_t *raw_out){
     // Leer 2 bytes de dato (MSB primero) + 1 byte de CRC (lo descartamos aquí)
     uint8_t msb = i2c_read_byte(1); // ACK para pedir el siguiente byte
     uint8_t lsb = i2c_read_byte(1); // ACK para pedir el CRC
-    uint8_t crc = i2c_read_byte(0);               // leer CRC y responder NACK (fin de lectura)
+    uint8_t crc = i2c_read_byte(0); // leer CRC y responder NACK (fin de lectura)
 
     i2c_stop();
     if (htu21d_crc8(msb, lsb) != crc) return 0; // dato corrupto: descartar esta lectura
     uint16_t raw = ((uint16_t)msb << 8) | lsb;
-    raw &= 0xFFFC; // los 2 bits menos significativos son bits de estado, no de dato
-    *raw_out = raw;
+    *raw_out = raw & 0xFFFC; // los 2 bits menos significativos son bits de estado, no de dato
     return 1;
 }
 
@@ -125,14 +126,9 @@ void htu21d_init(void){
     // Ambas líneas en alto (liberadas) al inicio
     PORTB |= (1 << SDA_PIN) | (1 << SCL_PIN);
     DDRB  |= (1 << SDA_PIN) | (1 << SCL_PIN);
-    USICR = 0; // USI en modo bit-banging manual (no usamos el contador USI aquí)
     sda_high();
     scl_high();
     I2C_DELAY();
-}
-
-uint8_t htu21d_request_temperature(){
-    return htu21d_request(HTU21D_CMD_TEMP_NOHOLD);
 }
  
 // Temperatura en °C. Devuelve 1 si la lectura fue exitosa. 
@@ -145,31 +141,15 @@ uint8_t htu21d_read_temperature(int16_t *temp_c100){
     return 1;
 }
 
-uint8_t htu21d_request_humidity(){
-    return htu21d_request(HTU21D_CMD_HUM_NOHOLD);
-}
-
 // Humedad relativa en %. Devuelve 1 si la lectura fue exitosa.
 uint8_t htu21d_read_humidity(int16_t *humidity_rh100){
     // RH = -6 + 125 * (raw / 65536), devuelto como centesimas de %HR (int16, valor x100)
     uint16_t raw;
     if (!htu21d_read(&raw)) return 0;
     int32_t h = ((int32_t)raw * 12500L) >> 16;   // 125 * 100 / 65536
-    *humidity_rh100 = (int16_t)(h - 600);             // -6 * 100 = -600
+    *humidity_rh100 = (int16_t)(h - 600);        // -6 * 100 = -600
     return 1;
 }
-
-// Reinicia el sensor (recomendado al inicio, tarda ~15ms en estar listo)
-uint8_t htu21d_reset(void){
-    uint8_t ok = htu21d_request(HTU21D_CMD_SOFT_RESET);
-    if (ok) _delay_ms(15);
-    return ok;
-}
-
-
-    #include <stdlib.h> // para dtostrf
-    #include <string.h>
-    #include "soft_uart.h"
 
 void htu21d_test(){
     char data[10];
@@ -177,7 +157,7 @@ void htu21d_test(){
     uint16_t temp, hum;
     uart_init(BAUD_RATE_9600);
     htu21d_init();
-    res = htu21d_request_temperature();
+    res = htu21d_request(HTU21D_CMD_TEMP_NOHOLD);
     if (res){ 
         _delay_ms(50);
         res = htu21d_read_temperature(&temp);
@@ -187,18 +167,19 @@ void htu21d_test(){
             soft_uart_send(data, strlen(data));
         }
     }
-    res = htu21d_request_humidity();
+    res = htu21d_request(HTU21D_CMD_HUM_NOHOLD);
     if (res){
         _delay_ms(50);
         res = htu21d_read_humidity(&hum);
         if (res){
             data[0] = 'H';
-            dtostrf(hum, 1, 2, &data[1]);            // ancho mínimo 1, 2 decimales
+            dtostrf(hum, 1, 2, &data[1]); // ancho mínimo 1, 2 decimales
             soft_uart_send(data, strlen(data));        
         }
     }
-    res = htu21d_reset();
+    res = htu21d_request(HTU21D_CMD_SOFT_RESET);
     if (res){
+        _delay_ms(15);
         data[0] = 'R';
         data[1] = '\0';
         soft_uart_send(data, strlen(data));

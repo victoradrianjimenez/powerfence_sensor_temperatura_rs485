@@ -1,18 +1,17 @@
 #pragma once
 #include <stdint.h>
 
-#define MODBUS_LITE_VERSION
-
 #define FIRMWARE_MAYOR_VERSION      1
 #define FIRMWARE_MINOR_VERSION      0
 
 /*****************************************************************************/
 
-#define REG_ADDR_FIRMWARE_VERSION       100
-#define REG_ADDR_SLAVE_ADDRESS          101
-#define REG_ADDR_BAUD_RATE              102
-#define REG_ADDR_PARITY                 103
-#define REG_ADDR_STOP_BITS              104
+#define REG_ADDR_CONFIG_BASE                   100
+#define REG_ADDR_CONFIG_FIRMWARE_VERSION       0
+#define REG_ADDR_CONFIG_SLAVE_ADDRESS          1
+#define REG_ADDR_CONFIG_BAUD_RATE              2
+#define REG_ADDR_CONFIG_PARITY                 3
+#define REG_ADDR_CONFIG_STOP_BITS              4
 
 enum {
     CONF_POS_FIRMWARE_VERSION=0,
