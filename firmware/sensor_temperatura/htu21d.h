@@ -26,4 +26,4 @@ uint8_t htu21d_read_temperature(int16_t *temp_c100);
  */
 uint8_t htu21d_read_humidity(int16_t *humidity_rh100);
 
-void htu21d_test();
+void htu21d_test(void);

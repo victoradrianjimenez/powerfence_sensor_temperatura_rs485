@@ -12,34 +12,40 @@
 #define UART_TOP_VALUE_14400 (68) // 8000000 / 8 / 14400 - 1 = 68,4444
 #define UART_PRESCALER_19200 (1 << CS01) // 8
 #define UART_TOP_VALUE_19200 (51) // 8000000 / 8 / 19200 - 1 = 51,0833
+#define UART_PRESCALER_8 (1 << CS01)
+#define UART_PRESCALER_64 ((1 << CS01) | (1 << CS00))
 
 #define UART_RX_MASK (1 << UART_RX)
 #define UART_TX_MASK (1 << UART_TX)
 
-#define INVALID_BYTE_VALUE (0xFF)
+//#define INVALID_BYTE_VALUE (0xFF)
 
 // Variables globales para UART
 static uint8_t uart_rx_buffer[UART_RX_BUFFER_SIZE]; // buffer de datos
 static uint8_t uart_rx_tail = 0; // posicion de lectura
 static volatile uint8_t uart_rx_head = 0; // posicion de escritura
-static uint8_t uart_rx_bit_count; // RX state machine variable
-static volatile uint8_t uart_tx_bit_count; // TX state machine variables
+//static uint8_t uart_rx_bit_count; // RX state machine variable
+//static volatile uint8_t uart_tx_bit_count; // TX state machine variables
+#define uart_rx_bit_count GPIOR0
+#define uart_tx_bit_count GPIOR1
+//static uint8_t uart0_rx_byte; // RX state machine variable
+#define uart_rx_byte GPIOR2 
 static volatile uint16_t uart_tx_data; // holds full TX frame (start + data + stop bits)
 static volatile uint8_t uart_half_value; // Half bit time used to sample in the middle of the bit
 
 void uart_init(baud_rate_t b) {
     // PINB como salida (1)
     DDRB |= UART_TX_MASK;
-    PORTB |= UART_TX_MASK;   // idle high (UART idle)
+    PORTB |= UART_TX_MASK; // idle high (UART idle)
     // PINB como entrada (0)
     DDRB &= ~UART_RX_MASK; 
-    PORTB |= UART_RX_MASK;   // habilita pull-up interno
+    PORTB |= UART_RX_MASK; // habilita pull-up interno
 #ifdef UART_DE   
     DDRB |= (1 << UART_DE);
-    PORTB &= ~(1 << UART_DE);  // poner en bajo (RE por defecto)
+    PORTB &= ~(1 << UART_DE); // poner en bajo (RE por defecto)
 #endif
     // configurar/habilitar timer0
-    TCCR0A = (1 << WGM01);          // CTC mode, normal port operation
+    TCCR0A = (1 << WGM01); // CTC mode, normal port operation
     soft_uart_set_baud_rate(b);
 
     // interrupciones de pines de entrada
@@ -49,38 +55,31 @@ void uart_init(baud_rate_t b) {
     sei();
 }
 
-uint8_t soft_uart_check_baud_rate(baud_rate_t b){
-    return b < BAUD_RATE_COUNT;
-}
-
-void soft_uart_set_baud_rate(baud_rate_t b){
-    switch (b){
-    case BAUD_RATE_2400:
-        TCCR0B = UART_PRESCALER_2400;
-        OCR0A = UART_TOP_VALUE_2400;
-        uart_half_value = UART_TOP_VALUE_2400 >> 1;
-        break;
-    case BAUD_RATE_4800:
-        TCCR0B = UART_PRESCALER_4800;
-        OCR0A = UART_TOP_VALUE_4800;
-        uart_half_value = UART_TOP_VALUE_4800 >> 1;
-        break;
-    case BAUD_RATE_14400:
-        TCCR0B = UART_PRESCALER_14400;
-        OCR0A = UART_TOP_VALUE_14400; 
-        uart_half_value = UART_TOP_VALUE_14400 >> 1;
-        break;
-    case BAUD_RATE_19200:
-        TCCR0B = UART_PRESCALER_19200;
-        OCR0A = UART_TOP_VALUE_19200;
-        uart_half_value = UART_TOP_VALUE_19200 >> 1;
-        break;
-    case BAUD_RATE_9600:
-    default:
-        TCCR0B = UART_PRESCALER_9600;
-        OCR0A = UART_TOP_VALUE_9600;
-        uart_half_value = UART_TOP_VALUE_9600 >> 1;
+baud_rate_t soft_uart_set_baud_rate(baud_rate_t b){
+    uint8_t top;
+    if (b == BAUD_RATE_2400){
+        TCCR0B = UART_PRESCALER_64;
+        top = UART_TOP_VALUE_2400;
+    } else {
+        switch (b){
+        case BAUD_RATE_4800:
+            top = UART_TOP_VALUE_4800;
+            break;
+        case BAUD_RATE_14400:
+            top = UART_TOP_VALUE_14400;
+            break;
+        case BAUD_RATE_19200:
+            top = UART_TOP_VALUE_19200;
+            break;
+        default:
+            top = UART_TOP_VALUE_9600;
+            b = BAUD_RATE_9600;
+        }
     }
+    TCCR0B = UART_PRESCALER_8;
+    OCR0A = top;
+    uart_half_value = top >> 1;
+    return b;
 }
 
 // Interrupción del pin UART0 RX (ambos flancos) para detección del start bit
@@ -104,7 +103,6 @@ ISR(PCINT0_vect) {
 
 // Interrupción TIMER0 COMPB para RX de UART0 (activa solo durante la recepción)
 ISR(TIMER0_COMPB_vect) {
-    #define uart_rx_byte GPIOR0 //static uint8_t uart0_rx_byte = 0; // RX state machine variable
     // Reading start bit + 8 data bits
     if (uart_rx_bit_count--){
         uart_rx_byte = (PINB & UART_RX_MASK) ? (uart_rx_byte >> 1) | 0x80 : (uart_rx_byte >> 1);
@@ -114,11 +112,8 @@ ISR(TIMER0_COMPB_vect) {
     if (PINB & UART_RX_MASK){
         // Store byte if buffer not full
         uint8_t pos = uart_rx_head;
-        uint8_t next = (pos + 1) & (UART_RX_BUFFER_SIZE - 1);
-        if (next != uart_rx_tail){
-            uart_rx_buffer[pos] = uart_rx_byte;
-            uart_rx_head = next;
-        }
+        uart_rx_buffer[pos] = uart_rx_byte;
+        uart_rx_head = (pos + 1) & (UART_RX_BUFFER_SIZE - 1);
     }
     // Re-enable start detection
     GIFR = (1 << PCIF);
@@ -129,28 +124,27 @@ ISR(TIMER0_COMPB_vect) {
 
 // Interrupción TIMER0 COMPA para TX de UART0
 ISR(TIMER0_COMPA_vect) {
-    uint16_t data = uart_tx_data;
      // Output current bit
-    if (data & 1)
+    if (uart_tx_data & 1)
         PORTB |= UART_TX_MASK;
     else
         PORTB &= ~UART_TX_MASK;
     // Shift to next bit
     if (uart_tx_bit_count--){
-        uart_tx_data = data >> 1;
+        uart_tx_data >>= 1;
         return;
     }
     // Transmission finished
     TIMSK &= ~(1 << OCIE0A);
 }
-
+ 
 void soft_uart_send(uint8_t* buf, uint8_t sz){
-    for (uint8_t i = 0; i < sz; i++){
+    while (sz--){
         // Wait while UART is transmitting
         while(TIMSK & ((1 << OCIE0A)));
         // Prepare frame: start + data + stop
-        uart_tx_data = ((uint16_t)buf[i] | 0xFF00) << 1; // el shift es para el start bit
-        uart_tx_bit_count = (i == sz - 1) ? 10 : 9; // 9: la ISR apaga el timer al iniciar el stop bit, 10: la ISR apaga el timer al TERMINAR el stop bit.
+        uart_tx_data = ((uint16_t)(*buf++) | 0xFF00) << 1; // el shift es para el start bit
+        uart_tx_bit_count = 10; //(i == sz - 1) ? 10 : 9; // 9: la ISR apaga el timer al iniciar el stop bit, 10: la ISR apaga el timer al TERMINAR el stop bit.
         // Start transmission (enable timer interruptions)
         TIFR = (1 << OCF0A);
         cli();
@@ -174,37 +168,26 @@ void soft_uart_re(){
 #endif
 }
 
-uint8_t soft_uart_busy() {
-    return TIMSK & ((1 << OCIE0A) | (1 << OCIE0B));
-}
-
 uint8_t soft_uart_available() {
-    return (uart_rx_head - uart_rx_tail) & (UART_RX_BUFFER_SIZE - 1);
+    return uart_rx_head != uart_rx_tail; // (uart_rx_head - uart_rx_tail) & (UART_RX_BUFFER_SIZE - 1);
 }
 
 uint8_t soft_uart_read() {
     uint8_t tail = uart_rx_tail;
-    if (tail == uart_rx_head) return INVALID_BYTE_VALUE;
+    //if (tail == uart_rx_head) return INVALID_BYTE_VALUE;
     uint8_t x = uart_rx_buffer[tail];
     uart_rx_tail = (tail + 1) & (UART_RX_BUFFER_SIZE - 1);
     return x;
 }
 
-void soft_uart_clean() {
-    uart_rx_tail = uart_rx_head;
-}
-
 // uart echo (un byte a la vez)
 void test_uart() {
     uart_init(BAUD_RATE_9600);
-    uint8_t b;
     while (1) {
         if (soft_uart_available()){
             //leer byte y reenviarlo
-            b = soft_uart_read(); 
-            soft_uart_de();
+            uint8_t b = soft_uart_read();
             soft_uart_send(&b, 1);
-            soft_uart_re();
         }
     }
 }
