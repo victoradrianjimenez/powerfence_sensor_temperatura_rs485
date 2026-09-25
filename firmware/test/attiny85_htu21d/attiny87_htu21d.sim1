@@ -30,7 +30,7 @@
 
 <item itemtype="SerialTerm" CircId="SerialTerm-39" mainComp="false" Show_id="false" Show_Val="false" Pos="40,-76" rotation="0" hflip="1" vflip="1" label="SerialTerm-39" idLabPos="-20,-32" labelrot="0" valLabPos="-16,20" valLabRot="0" Baudrate="9600 _Bd" DataBits="8 _bits" StopBits="1 _bits" SerialMon="true" />
 
-<item itemtype="MCU" CircId="tiny25-64" mainComp="false" Show_id="true" Show_Val="false" Pos="-56,-40" rotation="0" hflip="1" vflip="1" label="tiny25-64" idLabPos="0,-20" labelrot="0" valLabPos="-16,20" valLabRot="0" Frequency="8 MHz" Program="../../../../../../../../../../tmp/arduino_build_427603/sensor_temperatura.ino.hex" Auto_Load="true" saveEepr="true" Logic_Symbol="false" Rst_enabled="false" Ext_Osc="false" Wdt_enabled="false" Clk_Out="false" MainMcu="false" eeprom="1,0,2,0," />
+<item itemtype="MCU" CircId="tiny25-64" mainComp="false" Show_id="true" Show_Val="false" Pos="-56,-40" rotation="0" hflip="1" vflip="1" label="tiny25-64" idLabPos="0,-20" labelrot="0" valLabPos="-16,20" valLabRot="0" Frequency="8 MHz" Program="../../../../../../../../../../tmp/arduino_build_427603/sensor_temperatura.ino.hex" Auto_Load="true" saveEepr="false" Logic_Symbol="false" Rst_enabled="false" Ext_Osc="false" Wdt_enabled="false" Clk_Out="false" MainMcu="false" />
 
 <item itemtype="Node" CircId="Node-3" mainComp="false" Pos="-228,36" />
 
